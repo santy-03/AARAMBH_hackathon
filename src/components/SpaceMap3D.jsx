@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { EARTH_RADIUS_KM } from '../physics/constants.js';
 import { keplerianToStateVectors, generateOrbitPathPoints } from '../physics/orbitEngine.js';
-import { ZoomIn, ZoomOut, RotateCcw, Compass, Maximize2, Play, Pause, AlertTriangle } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Compass, Maximize2, Play, Pause, AlertTriangle, Layers } from 'lucide-react';
 
 // Scaling factor for 3D visualization canvas: 1 unit = 1000 km
 const SCALE = 1 / 1000;
