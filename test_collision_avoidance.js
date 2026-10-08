@@ -157,6 +157,29 @@ if (screenedResult.rejectedCandidates.length > 0) {
   console.error('  -> FAIL: Conflict was not rejected!\n');
 }
 
+console.log('[TEST 5] ISS (Space Station) vs Cosmos-1408 Fragment Collision Simulation:');
+const issScenario = HACKATHON_SCENARIOS.find(s => s.id === 'iss-critical-collision');
+const issSat = issScenario.satellite.keplerian;
+const issDeb = issScenario.primaryDebris.keplerian;
+
+const issConj = calculateConjunction(issSat, issDeb, 5400);
+console.log(`  ISS Closest Approach (TCA):     ${issConj.tcaMinutes.toFixed(2)} min`);
+console.log(`  ISS Miss Distance Before:       ${issConj.missDistanceKm.toFixed(3)} km (${(issConj.missDistanceKm * 1000).toFixed(0)} meters)`);
+console.log(`  ISS Relative Velocity:          ${issConj.relativeVelocityKmS.toFixed(2)} km/s`);
+
+const issOpt = optimizeAvoidanceManeuver(issSat, issDeb, 5.0, [], 1000, 300);
+const issRec = issOpt.recommendedManeuver;
+console.log(`  Optimal ISS Maneuver:           ${issRec.directionName}`);
+console.log(`  Impulse Delta-V:                ${issRec.deltaVMag_ms} m/s`);
+console.log(`  Post-Maneuver Miss Distance:    ${issRec.resultingMissDistanceKm} km`);
+console.log(`  Propellant Consumed:            ${issRec.propellantGrams} grams`);
+
+if (issConj.missDistanceKm < 1.0 && issRec.resultingMissDistanceKm >= 5.0) {
+  console.log('  -> PASS: ISS high-risk conjunction & minimum-energy clearance verified!\n');
+} else {
+  console.error('  -> FAIL: ISS conjunction test failed!\n');
+}
+
 console.log('================================================================');
 console.log('SUMMARY: ALL PHYSICS AND INTEGRATION TESTS PASSED (100% SUCCESS)');
 console.log('================================================================');

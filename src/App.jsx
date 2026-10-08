@@ -12,7 +12,7 @@ import HackathonPitchGuide from './components/HackathonPitchGuide.jsx';
 import BeforeAfterComparisonPanel from './components/BeforeAfterComparisonPanel.jsx';
 import ZoomedEncounterView from './components/ZoomedEncounterView.jsx';
 
-import { HACKATHON_SCENARIOS, generateBackgroundDebrisCatalog } from './physics/scenarios.js';
+import { HACKATHON_SCENARIOS, generateBackgroundDebrisCatalog, ISS_HAZARD_DEBRIS } from './physics/scenarios.js';
 import { calculateConjunction } from './physics/conjunction.js';
 import { calculateCollisionRisk } from './physics/riskModel.js';
 import { optimizeAvoidanceManeuver } from './physics/avoidanceOptimizer.js';
@@ -24,11 +24,11 @@ import { FileText } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export default function App() {
-  // Scenario & Orbit State
-  const [activeScenarioId, setActiveScenarioId] = useState('leo-high-risk');
-  const [activeLiveSatellite, setActiveLiveSatellite] = useState(POPULAR_LIVE_SATELLITES[0]); // Default ISS
+  // Scenario & Orbit State: Default to ISS Critical Collision Hazard
+  const [activeScenarioId, setActiveScenarioId] = useState('iss-critical-collision');
+  const [activeLiveSatellite, setActiveLiveSatellite] = useState(null);
   const [appliedManeuver, setAppliedManeuver] = useState(null);
-  const [activePrimaryDebris, setActivePrimaryDebris] = useState(null);
+  const [activePrimaryDebris, setActivePrimaryDebris] = useState(ISS_HAZARD_DEBRIS);
   const [customStateVectors, setCustomStateVectors] = useState(null);
   const [customDebrisList, setCustomDebrisList] = useState([]);
 
@@ -70,8 +70,11 @@ export default function App() {
     if (customStateVectors?.debKep) {
       return { id: 'CUSTOM-DEB-01', name: 'CUSTOM DEBRIS VECTOR', catalogNumber: 88888, origin: 'Custom State Input', sizeMeters: 1.5, keplerian: customStateVectors.debKep };
     }
+    if (activeLiveSatellite?.noradId === 25544) {
+      return ISS_HAZARD_DEBRIS;
+    }
     return activePrimaryDebris || activeScenario.primaryDebris;
-  }, [customStateVectors, activePrimaryDebris, activeScenario]);
+  }, [customStateVectors, activeLiveSatellite, activePrimaryDebris, activeScenario]);
 
   // Set active primary debris when scenario changes
   useEffect(() => {
@@ -86,6 +89,7 @@ export default function App() {
   // Reset states when changing scenario
   const handleSelectScenario = (id) => {
     setActiveScenarioId(id);
+    setActiveLiveSatellite(null);
     setAppliedManeuver(null);
     setSimTimeSeconds(0);
     setCameraMode('EARTH');
@@ -96,6 +100,9 @@ export default function App() {
 
   const handleSelectLiveSatellite = (satObj) => {
     setActiveLiveSatellite(satObj);
+    if (satObj.noradId === 25544) {
+      setActivePrimaryDebris(ISS_HAZARD_DEBRIS);
+    }
     setAppliedManeuver(null);
     setSimTimeSeconds(0);
     setCameraMode('SATELLITE');

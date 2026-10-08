@@ -3,39 +3,41 @@ import { EARTH_RADIUS_KM } from './constants.js';
 // Convert degrees to radians
 const deg2rad = d => (d * Math.PI) / 180;
 
+export const ISS_HAZARD_DEBRIS = {
+  id: 'KOSMOS-7712',
+  name: 'Cosmos-1408 ASAT Fragment #7712',
+  catalogNumber: 50124,
+  origin: 'Russian ASAT Weapon Test Breakup',
+  sizeMeters: 1.8,
+  massKg: 38.5,
+  keplerian: {
+    a: 6788.561,
+    e: 0.000256,
+    i: 1.629109,
+    raan: 1.104060,
+    argPer: 1.739703,
+    meanAnomaly: 1.355843
+  }
+};
+
 export const HACKATHON_SCENARIOS = [
   {
-    id: 'safe-pass-nominal',
-    name: 'Scenario 1: Safe Pass (No Maneuver Required)',
-    description: 'ISS encounter with orbital rocket body at 18.5 km safe miss distance. Evaluates NOMINAL state.',
+    id: 'iss-critical-collision',
+    name: 'Scenario 1: ISS vs Cosmos-1408 Debris (CRITICAL HAZARD)',
+    description: 'ISS (Space Station) on direct collision path with Cosmos-1408 ASAT Fragment #7712 at 8.79 km/s relative speed. Critical miss distance: 0.28 km (285 m).',
     satellite: {
-      name: 'ISS (ZARYA SAT-0)',
+      name: 'ISS (International Space Station)',
       noradId: 25544,
       keplerian: {
         a: EARTH_RADIUS_KM + 418, // 418 km altitude
-        e: 0.0006,
+        e: 0.00045,
         i: deg2rad(51.64),
-        raan: deg2rad(95.0),
-        argPer: deg2rad(130.0),
-        meanAnomaly: deg2rad(40.0)
+        raan: deg2rad(124.5),
+        argPer: deg2rad(45.2),
+        meanAnomaly: deg2rad(110.5)
       }
     },
-    primaryDebris: {
-      id: 'BG-9901',
-      name: 'SL-12 Spent Rocket Body',
-      catalogNumber: 28910,
-      origin: 'Orbital Stage Drift',
-      sizeMeters: 3.2,
-      massKg: 1200.0,
-      keplerian: {
-        a: EARTH_RADIUS_KM + 438, // 20 km higher altitude pass
-        e: 0.0010,
-        i: deg2rad(51.64),
-        raan: deg2rad(95.0),
-        argPer: deg2rad(130.0),
-        meanAnomaly: deg2rad(40.0)
-      }
-    }
+    primaryDebris: ISS_HAZARD_DEBRIS
   },
   {
     id: 'leo-high-risk',
