@@ -9,7 +9,6 @@ import DistanceGraph from './components/DistanceGraph.jsx';
 import MissionReportModal from './components/MissionReportModal.jsx';
 import AddDebrisModal from './components/AddDebrisModal.jsx';
 import HackathonPitchGuide from './components/HackathonPitchGuide.jsx';
-import HackathonAnswerPanel from './components/HackathonAnswerPanel.jsx';
 import BeforeAfterComparisonPanel from './components/BeforeAfterComparisonPanel.jsx';
 import ZoomedEncounterView from './components/ZoomedEncounterView.jsx';
 
@@ -371,18 +370,6 @@ export default function App() {
           onApplyManeuver={handleApplyManeuver}
           satelliteMassKg={satelliteMassKg}
           propulsionIsp={propulsionIsp}
-        />
-
-        {/* Direct Hackathon Problem Statement Output Panel */}
-        <HackathonAnswerPanel
-          satelliteName={currentSatellite.name}
-          primaryDebris={targetDebris}
-          conjunction={activeConjunction}
-          riskAssessment={riskAssessment}
-          optimizationResult={optimizationResult}
-          appliedManeuver={appliedManeuver}
-          onApplyManeuver={handleApplyManeuver}
-          onCustomStateInput={handleCustomStateInput}
         />
 
         {/* Workspace Grid */}
