@@ -67,7 +67,12 @@ export default function BeforeAfterComparisonPanel({
   const missDeltaKm = (activeConjunction?.missDistanceKm || 0) - (baselineConjunction?.missDistanceKm || 0);
 
   const hasSafeManeuver = !!activeMan;
-  const isAvoided = activeConjunction?.missDistanceKm >= 5.0;
+  const isAvoided = (activeConjunction?.missDistanceKm || 0) >= 5.0;
+
+  const fmt = (val, digits = 2, unit = '') => {
+    if (val == null || isNaN(val)) return '—';
+    return `${Number(val).toFixed(digits)}${unit ? ' ' + unit : ''}`;
+  };
 
   return (
     <div className="w-full bg-slate-900/90 border border-slate-800 rounded-2xl p-5 flex flex-col gap-5 backdrop-blur-md shadow-2xl font-mono text-slate-200">
@@ -167,7 +172,7 @@ export default function BeforeAfterComparisonPanel({
             </div>
             <p className="text-sm font-bold text-white mt-1">
               {isAvoided
-                ? `Maneuver diverted satellite from ${baselineConjunction?.missDistanceKm.toFixed(2)} km to ${activeConjunction?.missDistanceKm.toFixed(2)} km separation.`
+                ? `Maneuver diverted satellite from ${fmt(baselineConjunction?.missDistanceKm, 2, 'km')} to ${fmt(activeConjunction?.missDistanceKm, 2, 'km')} separation.`
                 : 'Satellite on dangerous conjunction path with primary debris target.'}
             </p>
           </div>
@@ -208,9 +213,9 @@ export default function BeforeAfterComparisonPanel({
             <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
               <span className="text-[10px] text-slate-400 uppercase">MISS DISTANCE</span>
               <p className="text-sm font-black text-white mt-1">
-                <span className="text-amber-400">{baselineConjunction?.missDistanceKm.toFixed(2)}</span>
+                <span className="text-amber-400">{fmt(baselineConjunction?.missDistanceKm, 2)}</span>
                 <span className="text-slate-500 mx-1">→</span>
-                <span className="text-emerald-400">{activeConjunction?.missDistanceKm.toFixed(2)}</span>
+                <span className="text-emerald-400">{fmt(activeConjunction?.missDistanceKm, 2)}</span>
                 <span className="text-xs text-slate-400 ml-1">km</span>
               </p>
               <span className="text-[10px] text-emerald-400 font-bold">+{missDeltaKm.toFixed(2)} km safe margin</span>
@@ -219,11 +224,11 @@ export default function BeforeAfterComparisonPanel({
             <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
               <span className="text-[10px] text-slate-400 uppercase">COLLISION PROBABILITY Pc</span>
               <p className="text-sm font-black mt-1">
-                <span className="text-rose-400">{baselineRisk?.collisionProbabilityScientific}</span>
+                <span className="text-rose-400">{baselineRisk?.collisionProbabilityScientific || baselineRisk?.pcString || '1.0e-3'}</span>
                 <span className="text-slate-500 mx-1">→</span>
-                <span className="text-emerald-400">{activeRisk?.collisionProbabilityScientific}</span>
+                <span className="text-emerald-400">{activeRisk?.collisionProbabilityScientific || activeRisk?.pcString || '1.0e-8'}</span>
               </p>
-              <span className="text-[10px] text-slate-400">{baselineRisk?.threatLevel.name} → {activeRisk?.threatLevel.name}</span>
+              <span className="text-[10px] text-slate-400">{baselineRisk?.threatLevel?.name || 'CRITICAL'} → {activeRisk?.threatLevel?.name || 'NOMINAL'}</span>
             </div>
 
             <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
@@ -250,7 +255,7 @@ export default function BeforeAfterComparisonPanel({
                 <Clock className="w-4 h-4 text-cyan-400" />
                 CONJUNCTION & MANEUVER MISSION TIMELINE
               </span>
-              <span className="text-[10px] text-slate-400">TCA Epoch Reference T = {baselineConjunction?.tcaMinutes.toFixed(1)}m</span>
+              <span className="text-[10px] text-slate-400">TCA Epoch Reference T = {fmt(baselineConjunction?.tcaMinutes, 1)}m</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3 pt-2">
@@ -277,7 +282,7 @@ export default function BeforeAfterComparisonPanel({
               <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-center">
                 <span className="text-[10px] text-slate-400">T = 0 (TCA)</span>
                 <p className="text-xs font-bold text-white mt-1">Closest Approach</p>
-                <p className="text-[10px] text-emerald-400">Cleared at {activeConjunction?.missDistanceKm.toFixed(2)} km</p>
+                <p className="text-[10px] text-emerald-400">Cleared at {fmt(activeConjunction?.missDistanceKm, 2, 'km')}</p>
               </div>
 
               <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-center">
@@ -322,8 +327,8 @@ export default function BeforeAfterComparisonPanel({
                 <tr className="hover:bg-slate-900/50">
                   <td className="p-3 font-bold text-white">Altitude</td>
                   <td className="p-3 text-slate-400">h (km)</td>
-                  <td className="p-3 text-amber-300">{beforeState?.altitudeKm.toFixed(2)} km</td>
-                  <td className="p-3 text-emerald-300">{afterState?.altitudeKm.toFixed(2)} km</td>
+                  <td className="p-3 text-amber-300">{fmt(beforeState?.altitudeKm, 2, 'km')}</td>
+                  <td className="p-3 text-emerald-300">{fmt(afterState?.altitudeKm, 2, 'km')}</td>
                   <td className="p-3">
                     <span className="px-2 py-0.5 rounded font-bold bg-slate-800 text-slate-200">
                       {altDeltaKm >= 0 ? `+${altDeltaKm.toFixed(3)} km` : `${altDeltaKm.toFixed(3)} km`}
@@ -335,8 +340,8 @@ export default function BeforeAfterComparisonPanel({
                 <tr className="hover:bg-slate-900/50">
                   <td className="p-3 font-bold text-white">Semi-Major Axis</td>
                   <td className="p-3 text-slate-400">a (km)</td>
-                  <td className="p-3 text-amber-300">{beforeState?.semiMajorAxisKm.toFixed(3)} km</td>
-                  <td className="p-3 text-emerald-300">{afterState?.semiMajorAxisKm.toFixed(3)} km</td>
+                  <td className="p-3 text-amber-300">{fmt(beforeState?.semiMajorAxisKm, 3, 'km')}</td>
+                  <td className="p-3 text-emerald-300">{fmt(afterState?.semiMajorAxisKm, 3, 'km')}</td>
                   <td className="p-3">
                     <span className="px-2 py-0.5 rounded font-bold bg-slate-800 text-slate-200">
                       {smaDeltaKm >= 0 ? `+${smaDeltaKm.toFixed(3)} km` : `${smaDeltaKm.toFixed(3)} km`}
@@ -348,8 +353,8 @@ export default function BeforeAfterComparisonPanel({
                 <tr className="hover:bg-slate-900/50">
                   <td className="p-3 font-bold text-white">Eccentricity</td>
                   <td className="p-3 text-slate-400">e (dimensionless)</td>
-                  <td className="p-3 text-amber-300">{beforeState?.eccentricity.toFixed(6)}</td>
-                  <td className="p-3 text-emerald-300">{afterState?.eccentricity.toFixed(6)}</td>
+                  <td className="p-3 text-amber-300">{fmt(beforeState?.eccentricity, 6)}</td>
+                  <td className="p-3 text-emerald-300">{fmt(afterState?.eccentricity, 6)}</td>
                   <td className="p-3">
                     <span className="px-2 py-0.5 rounded font-bold bg-slate-800 text-slate-200">
                       {eccDelta >= 0 ? `+${eccDelta.toFixed(6)}` : `${eccDelta.toFixed(6)}`}
@@ -361,8 +366,8 @@ export default function BeforeAfterComparisonPanel({
                 <tr className="hover:bg-slate-900/50">
                   <td className="p-3 font-bold text-white">Inclination</td>
                   <td className="p-3 text-slate-400">i (deg)</td>
-                  <td className="p-3 text-amber-300">{beforeState?.inclinationDeg.toFixed(4)}°</td>
-                  <td className="p-3 text-emerald-300">{afterState?.inclinationDeg.toFixed(4)}°</td>
+                  <td className="p-3 text-amber-300">{fmt(beforeState?.inclinationDeg, 4)}°</td>
+                  <td className="p-3 text-emerald-300">{fmt(afterState?.inclinationDeg, 4)}°</td>
                   <td className="p-3">
                     <span className={`px-2 py-0.5 rounded font-bold ${Math.abs(incDeltaDeg) > 0.0001 ? 'bg-purple-950 text-purple-300' : 'bg-slate-800 text-slate-400'}`}>
                       {incDeltaDeg >= 0 ? `+${incDeltaDeg.toFixed(5)}°` : `${incDeltaDeg.toFixed(5)}°`}
@@ -374,8 +379,8 @@ export default function BeforeAfterComparisonPanel({
                 <tr className="hover:bg-slate-900/50">
                   <td className="p-3 font-bold text-white">RAAN</td>
                   <td className="p-3 text-slate-400">Ω (deg)</td>
-                  <td className="p-3 text-amber-300">{beforeState?.raanDeg.toFixed(4)}°</td>
-                  <td className="p-3 text-emerald-300">{afterState?.raanDeg.toFixed(4)}°</td>
+                  <td className="p-3 text-amber-300">{fmt(beforeState?.raanDeg, 4)}°</td>
+                  <td className="p-3 text-emerald-300">{fmt(afterState?.raanDeg, 4)}°</td>
                   <td className="p-3">
                     <span className="px-2 py-0.5 rounded font-bold bg-slate-800 text-slate-300">
                       {((afterState?.raanDeg || 0) - (beforeState?.raanDeg || 0)).toFixed(4)}°
@@ -387,8 +392,8 @@ export default function BeforeAfterComparisonPanel({
                 <tr className="hover:bg-slate-900/50">
                   <td className="p-3 font-bold text-white">Orbital Period</td>
                   <td className="p-3 text-slate-400">T (min)</td>
-                  <td className="p-3 text-amber-300">{beforeState?.orbitalPeriodMin.toFixed(3)} min</td>
-                  <td className="p-3 text-emerald-300">{afterState?.orbitalPeriodMin.toFixed(3)} min</td>
+                  <td className="p-3 text-amber-300">{fmt(beforeState?.orbitalPeriodMin, 3, 'min')}</td>
+                  <td className="p-3 text-emerald-300">{fmt(afterState?.orbitalPeriodMin, 3, 'min')}</td>
                   <td className="p-3">
                     <span className="px-2 py-0.5 rounded font-bold bg-slate-800 text-slate-200">
                       {periodDeltaMin >= 0 ? `+${periodDeltaMin.toFixed(3)} min` : `${periodDeltaMin.toFixed(3)} min`}
@@ -400,8 +405,8 @@ export default function BeforeAfterComparisonPanel({
                 <tr className="hover:bg-slate-900/50 bg-emerald-950/20">
                   <td className="p-3 font-bold text-white">Minimum Miss Distance</td>
                   <td className="p-3 text-slate-400">d_min (km)</td>
-                  <td className="p-3 text-amber-400 font-bold">{baselineConjunction?.missDistanceKm.toFixed(3)} km</td>
-                  <td className="p-3 text-emerald-400 font-bold">{activeConjunction?.missDistanceKm.toFixed(3)} km</td>
+                  <td className="p-3 text-amber-400 font-bold">{fmt(baselineConjunction?.missDistanceKm, 3, 'km')}</td>
+                  <td className="p-3 text-emerald-400 font-bold">{fmt(activeConjunction?.missDistanceKm, 3, 'km')}</td>
                   <td className="p-3">
                     <span className="px-2 py-0.5 rounded font-bold bg-emerald-900 text-emerald-300">
                       +{missDeltaKm.toFixed(3)} km
@@ -522,11 +527,11 @@ export default function BeforeAfterComparisonPanel({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div className="p-3 rounded-lg bg-slate-950/80 border border-slate-800">
                 <span className="text-slate-400">Before Inclination:</span>
-                <p className="text-base font-bold text-white mt-0.5">{beforeState?.inclinationDeg.toFixed(5)}°</p>
+                <p className="text-base font-bold text-white mt-0.5">{fmt(beforeState?.inclinationDeg, 5)}°</p>
               </div>
               <div className="p-3 rounded-lg bg-slate-950/80 border border-slate-800">
                 <span className="text-slate-400">After Inclination:</span>
-                <p className="text-base font-bold text-purple-300 mt-0.5">{afterState?.inclinationDeg.toFixed(5)}°</p>
+                <p className="text-base font-bold text-purple-300 mt-0.5">{fmt(afterState?.inclinationDeg, 5)}°</p>
               </div>
             </div>
 

@@ -55,7 +55,7 @@ export function generateMasterApiPayload(
       tca_minutes_remaining: parseFloat(conjunction.tcaMinutes.toFixed(2)),
       miss_distance_km: parseFloat(conjunction.missDistanceKm.toFixed(3)),
       relative_velocity_km_s: parseFloat(conjunction.relativeVelocityKmS.toFixed(3)),
-      risk: riskAssessment.threatLevel.name,
+      risk: riskAssessment.threatLevel?.name || 'NOMINAL',
       risk_score_100: riskAssessment.riskScore,
       probability_pc: riskAssessment.pcString
     },
@@ -73,12 +73,12 @@ export function generateMasterApiPayload(
     after_maneuver: recManeuver
       ? {
           miss_distance_km: recManeuver.resultingMissDistanceKm,
-          risk: recManeuver.resultingThreatLevel.name,
+          risk: recManeuver.resultingThreatLevel?.name || 'NOMINAL',
           risk_score_100: recManeuver.resultingRiskScore
         }
       : {
           miss_distance_km: conjunction.missDistanceKm.toFixed(3),
-          risk: riskAssessment.threatLevel.name,
+          risk: riskAssessment.threatLevel?.name || 'NOMINAL',
           risk_score_100: riskAssessment.riskScore
         },
     secondary_conjunctions: {

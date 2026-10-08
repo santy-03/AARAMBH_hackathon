@@ -31,6 +31,7 @@ export default function App() {
   const [appliedManeuver, setAppliedManeuver] = useState(null);
   const [activePrimaryDebris, setActivePrimaryDebris] = useState(null);
   const [customStateVectors, setCustomStateVectors] = useState(null);
+  const [customDebrisList, setCustomDebrisList] = useState([]);
 
   // Propulsion & Safety Parameters (Section 16, 21)
   const [satelliteMassKg, setSatelliteMassKg] = useState(1000);
