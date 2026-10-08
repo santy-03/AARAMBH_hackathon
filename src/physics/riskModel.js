@@ -62,6 +62,7 @@ export function calculateCollisionRisk(
     riskScore: finalRiskScore,
     probabilityOfCollision,
     pcString,
+    collisionProbabilityScientific: pcString,
     threatLevel,
     isUnsafe: missDistanceKm < safeThresholdKm,
     kineticEnergyScore: (0.5 * (relativeVelocityKmS * 1000) ** 2 / 1e6).toFixed(1) // MJ/kg equivalent

@@ -10,6 +10,8 @@ import MissionReportModal from './components/MissionReportModal.jsx';
 import AddDebrisModal from './components/AddDebrisModal.jsx';
 import HackathonPitchGuide from './components/HackathonPitchGuide.jsx';
 import HackathonAnswerPanel from './components/HackathonAnswerPanel.jsx';
+import BeforeAfterComparisonPanel from './components/BeforeAfterComparisonPanel.jsx';
+import ZoomedEncounterView from './components/ZoomedEncounterView.jsx';
 
 import { HACKATHON_SCENARIOS, generateBackgroundDebrisCatalog } from './physics/scenarios.js';
 import { calculateConjunction } from './physics/conjunction.js';
@@ -27,9 +29,13 @@ export default function App() {
   const [activeScenarioId, setActiveScenarioId] = useState('leo-high-risk');
   const [activeLiveSatellite, setActiveLiveSatellite] = useState(POPULAR_LIVE_SATELLITES[0]); // Default ISS
   const [appliedManeuver, setAppliedManeuver] = useState(null);
-  const [customDebrisList, setCustomDebrisList] = useState([]);
   const [activePrimaryDebris, setActivePrimaryDebris] = useState(null);
   const [customStateVectors, setCustomStateVectors] = useState(null);
+
+  // Propulsion & Safety Parameters (Section 16, 21)
+  const [satelliteMassKg, setSatelliteMassKg] = useState(1000);
+  const [propulsionIsp, setPropulsionIsp] = useState(300);
+  const [safetyThresholdKm, setSafetyThresholdKm] = useState(5.0);
 
   // Simulation Clock State
   const [simTimeSeconds, setSimTimeSeconds] = useState(0);
@@ -124,6 +130,15 @@ export default function App() {
     return calculateConjunction(currentSatellite.keplerian, targetDebris.keplerian);
   }, [currentSatellite, targetDebris]);
 
+  // Baseline Risk Assessment
+  const baselineRisk = useMemo(() => {
+    return calculateCollisionRisk(
+      baselineConjunction.missDistanceKm,
+      baselineConjunction.relativeVelocityKmS,
+      safetyThresholdKm
+    );
+  }, [baselineConjunction, safetyThresholdKm]);
+
   // 2. Calculate Active Conjunction (with applied maneuver if any)
   const activeConjunction = useMemo(() => {
     return calculateConjunction(
@@ -138,19 +153,22 @@ export default function App() {
   const riskAssessment = useMemo(() => {
     return calculateCollisionRisk(
       activeConjunction.missDistanceKm,
-      activeConjunction.relativeVelocityKmS
+      activeConjunction.relativeVelocityKmS,
+      safetyThresholdKm
     );
-  }, [activeConjunction]);
+  }, [activeConjunction, safetyThresholdKm]);
 
   // 4. Minimum-Energy Avoidance Maneuver Optimizer
   const optimizationResult = useMemo(() => {
     return optimizeAvoidanceManeuver(
       currentSatellite.keplerian,
       targetDebris.keplerian,
-      5.0,
-      bgDebrisCatalog
+      safetyThresholdKm,
+      bgDebrisCatalog,
+      satelliteMassKg,
+      propulsionIsp
     );
-  }, [currentSatellite, targetDebris, bgDebrisCatalog]);
+  }, [currentSatellite, targetDebris, safetyThresholdKm, bgDebrisCatalog, satelliteMassKg, propulsionIsp]);
 
   // Simulation loop timer
   useEffect(() => {
@@ -269,7 +287,91 @@ export default function App() {
       />
 
       {/* Main Dashboard Layout */}
-      <main className="flex-1 p-4 md:p-6 space-y-5 max-w-[1800px] mx-auto w-full">
+      <main className="flex-1 p-4 md:p-6 space-y-6 max-w-[1800px] mx-auto w-full">
+        {/* Simulation Workflow Controls & Parameters Bar (Section 21, 27) */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl font-mono text-xs backdrop-blur-md">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={() => {
+                setAppliedManeuver(null);
+                setSimTimeSeconds(baselineConjunction.tcaSeconds);
+              }}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold border border-slate-700 transition-all flex items-center gap-1.5 shadow-md"
+              title="Reset maneuver and simulate unmaneuvered baseline trajectory"
+            >
+              ⏮️ [1. Run Before Simulation]
+            </button>
+            <button
+              onClick={() => {
+                if (optimizationResult?.recommendedManeuver) {
+                  audioEngine.playSuccessChime();
+                }
+              }}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold border border-slate-700 transition-all flex items-center gap-1.5 shadow-md"
+              title="Evaluate 6-directional candidate burns with secondary screening"
+            >
+              ⚙️ [2. Generate Avoidance Maneuvers]
+            </button>
+            <button
+              onClick={handleExecuteRecommendedManeuver}
+              className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold border border-emerald-500 transition-all flex items-center gap-1.5 shadow-lg"
+              title="Apply minimum-energy burn and simulate post-maneuver trajectory"
+            >
+              🚀 [3. Run After Simulation]
+            </button>
+          </div>
+
+          {/* Configurable Parameters Toolbar (Section 16, 21) */}
+          <div className="flex flex-wrap items-center gap-4 text-slate-400 bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-800">
+            <div className="flex items-center gap-1.5">
+              <span>Sat Mass (m0):</span>
+              <input
+                type="number"
+                value={satelliteMassKg}
+                onChange={e => setSatelliteMassKg(Math.max(10, parseFloat(e.target.value) || 1000))}
+                className="w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-white text-center font-bold"
+              />
+              <span>kg</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span>Thruster Isp:</span>
+              <input
+                type="number"
+                value={propulsionIsp}
+                onChange={e => setPropulsionIsp(Math.max(50, parseFloat(e.target.value) || 300))}
+                className="w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-white text-center font-bold"
+              />
+              <span>s</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span>Safe Clearance:</span>
+              <input
+                type="number"
+                step="0.5"
+                value={safetyThresholdKm}
+                onChange={e => setSafetyThresholdKm(Math.max(1.0, parseFloat(e.target.value) || 5.0))}
+                className="w-14 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-emerald-400 text-center font-bold"
+              />
+              <span>km</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Dedicated BEFORE vs AFTER Collision Avoidance Simulation Component (Section 2, 8, 9, 10, 11, 15, 17, 18, 19) */}
+        <BeforeAfterComparisonPanel
+          satelliteName={currentSatellite.name}
+          primaryDebris={targetDebris}
+          baselineConjunction={baselineConjunction}
+          activeConjunction={activeConjunction}
+          baselineRisk={baselineRisk}
+          activeRisk={riskAssessment}
+          appliedManeuver={appliedManeuver}
+          optimizationResult={optimizationResult}
+          onApplyManeuver={handleApplyManeuver}
+          satelliteMassKg={satelliteMassKg}
+          propulsionIsp={propulsionIsp}
+        />
+
         {/* Direct Hackathon Problem Statement Output Panel */}
         <HackathonAnswerPanel
           satelliteName={currentSatellite.name}
@@ -336,7 +438,7 @@ export default function App() {
               />
             </div>
 
-            {/* Bottom Grid: Avoidance Optimizer Panel & Distance Graph */}
+            {/* Bottom Grid: Avoidance Optimizer Panel & Dual Charts */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
               <AvoidanceOptimizerPanel
                 optimizationResult={optimizationResult}
@@ -352,6 +454,14 @@ export default function App() {
                   simTimeSeconds={simTimeSeconds}
                   tcaMinutes={baselineConjunction.tcaMinutes}
                   hasAppliedManeuver={!!appliedManeuver}
+                  safeDistanceKm={safetyThresholdKm}
+                />
+
+                <ZoomedEncounterView
+                  baselineConjunction={baselineConjunction}
+                  activeConjunction={activeConjunction}
+                  appliedManeuver={appliedManeuver}
+                  safeDistanceKm={safetyThresholdKm}
                 />
 
                 {/* Generate Mission Report Certificate Button */}

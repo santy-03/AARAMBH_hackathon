@@ -1,5 +1,11 @@
 import { BURN_DIRECTIONS, DEFAULT_SAFE_DISTANCE_KM } from './constants.js';
-import { applyManeuverImpulse, calculatePropellantMass } from './orbitEngine.js';
+import {
+  applyManeuverImpulse,
+  calculatePropellantMass,
+  keplerianToStateVectors,
+  extractOrbitalState,
+  compareOrbitalStates
+} from './orbitEngine.js';
 import { calculateConjunction } from './conjunction.js';
 import { calculateCollisionRisk } from './riskModel.js';
 
@@ -13,12 +19,16 @@ import { calculateCollisionRisk } from './riskModel.js';
  * @param {Object} debrisElem - Target primary debris Keplerian elements
  * @param {Number} targetSafetyKm - Minimum required safe distance (default 5.0 km)
  * @param {Array} backgroundCatalog - Catalog of secondary debris items to screen against
+ * @param {Number} satelliteMassKg - Wet mass of satellite (kg, default 1000)
+ * @param {Number} propulsionIspSeconds - Thruster specific impulse (s, default 300)
  */
 export function optimizeAvoidanceManeuver(
   satElem,
   debrisElem,
   targetSafetyKm = DEFAULT_SAFE_DISTANCE_KM,
-  backgroundCatalog = []
+  backgroundCatalog = [],
+  satelliteMassKg = 1000,
+  propulsionIspSeconds = 300
 ) {
   // 1. Initial unmaneuvered conjunction baseline
   const baselineConj = calculateConjunction(satElem, debrisElem);
@@ -31,6 +41,8 @@ export function optimizeAvoidanceManeuver(
       candidates: [],
       rejectedCandidates: [],
       isAlreadySafe: true,
+      secondaryObjectsChecked: backgroundCatalog.length,
+      secondaryConjunctionsCount: 0,
       secondaryScreeningStatus: 'SAFE',
       baseline: { conjunction: baselineConj, risk: baselineRisk }
     };
@@ -53,7 +65,7 @@ export function optimizeAvoidanceManeuver(
     { key: 'RADIAL_IN', dir: BURN_DIRECTIONS.RADIAL_IN, ricUnit: [-1, 0, 0] }
   ];
 
-  // Limit background debris screening sample size to top 20 nearest orbits for high speed
+  // Limit background debris screening sample size to top 30 nearest orbits for high speed
   const sampleSecondaryDebris = backgroundCatalog.slice(0, 30);
 
   // 3. Evaluate each direction & lead time combination
@@ -61,8 +73,8 @@ export function optimizeAvoidanceManeuver(
     candidateLeadTimesMin.forEach(leadMin => {
       const burnTimeSeconds = Math.max(0, tcaSeconds - leadMin * 60);
 
-      // Binary search for minimum Delta-V in range [0.05 m/s, 25.0 m/s]
-      let dvLow = 0.05;
+      // Binary search for minimum Delta-V in range [0.01 m/s, 25.0 m/s]
+      let dvLow = 0.01;
       let dvHigh = 25.0;
       let bestDvMs = dvHigh;
       let bestConj = null;
@@ -87,7 +99,24 @@ export function optimizeAvoidanceManeuver(
 
       if (bestConj && bestDvMs < 24.5) {
         const postRisk = calculateCollisionRisk(bestConj.missDistanceKm, bestConj.relativeVelocityKmS, targetSafetyKm);
-        const fuelCalc = calculatePropellantMass(bestDvMs, 1000, 300); // 1000 kg satellite, 300s Isp
+        const fuelCalc = calculatePropellantMass(bestDvMs, satelliteMassKg, propulsionIspSeconds);
+
+        // Compute physical orbital states Before vs After at burn point
+        const satStateAtBurn = keplerianToStateVectors(satElem, burnTimeSeconds);
+        const stateBeforeOrbital = extractOrbitalState(satStateAtBurn.position, satStateAtBurn.velocity);
+
+        const postBurnVelocity = [
+          satStateAtBurn.velocity[0] + bestManeuverObj.dV_ECI[0],
+          satStateAtBurn.velocity[1] + bestManeuverObj.dV_ECI[1],
+          satStateAtBurn.velocity[2] + bestManeuverObj.dV_ECI[2]
+        ];
+        const stateAfterOrbital = extractOrbitalState(satStateAtBurn.position, postBurnVelocity);
+        const orbitalComparison = compareOrbitalStates(
+          stateBeforeOrbital,
+          stateAfterOrbital,
+          [ricUnit[0] * bestDvMs, ricUnit[1] * bestDvMs, ricUnit[2] * bestDvMs],
+          bestManeuverObj.dV_ECI
+        );
 
         // 4. SECONDARY SCREENING against background catalog
         let secondaryConflict = null;
@@ -118,14 +147,18 @@ export function optimizeAvoidanceManeuver(
             parseFloat((ricUnit[1] * bestDvMs).toFixed(3)),
             parseFloat((ricUnit[2] * bestDvMs).toFixed(3))
           ],
+          deltaV_ECI_km_s: bestManeuverObj.dV_ECI,
           resultingMissDistanceKm: parseFloat(bestConj.missDistanceKm.toFixed(2)),
           resultingRiskScore: postRisk.riskScore,
           resultingThreatLevel: postRisk.threatLevel,
-          energyCostRating: bestDvMs < 2.0 ? 'VERY LOW' : bestDvMs < 5.0 ? 'LOW' : bestDvMs < 10.0 ? 'MEDIUM' : 'HIGH',
+          energyCostRating: bestDvMs < 1.0 ? 'VERY LOW' : bestDvMs < 3.0 ? 'LOW' : bestDvMs < 8.0 ? 'MEDIUM' : 'HIGH',
           propellantKg: fuelCalc.propellantKg,
           propellantGrams: fuelCalc.propellantGrams,
+          initialMassKg: satelliteMassKg,
+          ispSeconds: propulsionIspSeconds,
           maneuverObj: bestManeuverObj,
           postConjunction: bestConj,
+          orbitalComparison,
           secondaryConflict
         };
 
@@ -142,7 +175,7 @@ export function optimizeAvoidanceManeuver(
   validCandidates.sort((a, b) => a.deltaVMag_ms - b.deltaVMag_ms);
   rejectedCandidates.sort((a, b) => a.deltaVMag_ms - b.deltaVMag_ms);
 
-  const recommendedManeuver = validCandidates.length > 0 ? validCandidates[0] : (rejectedCandidates[0] || null);
+  const recommendedManeuver = validCandidates.length > 0 ? validCandidates[0] : null;
 
   // Unoptimized late burn baseline for energy saving % comparison
   const unoptimizedCandidate = validCandidates.find(c => c.directionKey === 'RADIAL_OUT' && c.leadTimeMinutes === 5) || validCandidates[validCandidates.length - 1];
@@ -152,10 +185,12 @@ export function optimizeAvoidanceManeuver(
 
   return {
     recommendedManeuver,
-    candidates: validCandidates.slice(0, 8),
+    candidates: validCandidates.slice(0, 10),
     rejectedCandidates,
     isAlreadySafe: false,
     energySavingsPercent,
+    secondaryObjectsChecked: sampleSecondaryDebris.length,
+    secondaryConjunctionsCount: rejectedCandidates.length,
     secondaryScreeningStatus: rejectedCandidates.length > 0 ? 'SECONDARY_HAZARDS_SCREENED' : 'SAFE',
     baseline: { conjunction: baselineConj, risk: baselineRisk }
   };

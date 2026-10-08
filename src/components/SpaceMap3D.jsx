@@ -41,8 +41,19 @@ export default function SpaceMap3D({
   // Animated orbit motion particle refs
   const satPulseDotRef = useRef(null);
   const debrisPulseDotRef = useRef(null);
+  const burnPointMeshRef = useRef(null);
+  const velArrowRef = useRef(null);
 
   const [autoRotate, setAutoRotate] = useState(false);
+  const [showLayerToggles, setShowLayerToggles] = useState(false);
+  const [layers, setLayers] = useState({
+    beforeOrbit: true,
+    afterOrbit: true,
+    debrisOrbit: true,
+    velocityVector: true,
+    tcaPoint: true,
+    burnPoint: true
+  });
 
   // 1. Initialize Three.js Scene, Camera, Lighting, Controls
   useEffect(() => {
@@ -320,7 +331,7 @@ export default function SpaceMap3D({
     };
   }, []);
 
-  // 2. Update Orbit Path Lines (Thicker & Glowing)
+  // 2. Update Orbit Path Lines & Burn Point Markers
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene || !satElem || !debrisElem) return;
@@ -328,13 +339,15 @@ export default function SpaceMap3D({
     if (satOrbitLineRef.current) scene.remove(satOrbitLineRef.current);
     if (satPostOrbitLineRef.current) scene.remove(satPostOrbitLineRef.current);
     if (debrisOrbitLineRef.current) scene.remove(debrisOrbitLineRef.current);
+    if (burnPointMeshRef.current) scene.remove(burnPointMeshRef.current);
 
-    // Baseline Satellite Orbit (Cyan Line)
+    // Baseline Satellite Orbit (Amber/Cyan Line)
     const satPathPoints = generateOrbitPathPoints(satElem, 0, 120);
     const satVecs = satPathPoints.map(p => new THREE.Vector3(p.position[0] * SCALE, p.position[1] * SCALE, p.position[2] * SCALE));
     const satGeo = new THREE.BufferGeometry().setFromPoints(satVecs);
     const satMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 3 });
     const satLine = new THREE.LineLoop(satGeo, satMat);
+    satLine.visible = layers.beforeOrbit;
     scene.add(satLine);
     satOrbitLineRef.current = satLine;
 
@@ -345,6 +358,7 @@ export default function SpaceMap3D({
     const debrisMat = new THREE.LineDashedMaterial({ color: 0xef4444, dashSize: 0.5, gapSize: 0.2, linewidth: 3 });
     const debrisLine = new THREE.LineLoop(debrisGeo, debrisMat);
     debrisLine.computeLineDistances();
+    debrisLine.visible = layers.debrisOrbit;
     scene.add(debrisLine);
     debrisOrbitLineRef.current = debrisLine;
 
@@ -355,14 +369,40 @@ export default function SpaceMap3D({
       const postGeo = new THREE.BufferGeometry().setFromPoints(postVecs);
       const postMat = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 4 });
       const postLine = new THREE.LineLoop(postGeo, postMat);
+      postLine.visible = layers.afterOrbit;
       scene.add(postLine);
       satPostOrbitLineRef.current = postLine;
+
+      // Burn Point Marker (Glowing Diamond Mesh)
+      const burnState = keplerianToStateVectors(satElem, appliedManeuver.burnTimeSeconds);
+      const burnGroup = new THREE.Group();
+      const burnGeo = new THREE.OctahedronGeometry(0.35, 0);
+      const burnMat = new THREE.MeshStandardMaterial({
+        color: 0xf59e0b,
+        emissive: 0xd97706,
+        emissiveIntensity: 1.2
+      });
+      const burnMesh = new THREE.Mesh(burnGeo, burnMat);
+      burnGroup.add(burnMesh);
+
+      const burnLight = new THREE.PointLight(0xf59e0b, 2.5, 4);
+      burnGroup.add(burnLight);
+
+      burnGroup.position.set(
+        burnState.position[0] * SCALE,
+        burnState.position[1] * SCALE,
+        burnState.position[2] * SCALE
+      );
+      burnGroup.visible = layers.burnPoint;
+      scene.add(burnGroup);
+      burnPointMeshRef.current = burnGroup;
     }
-  }, [satElem, debrisElem, appliedManeuver]);
+  }, [satElem, debrisElem, appliedManeuver, layers]);
 
   // 3. Dynamic Position & Camera Updates
   useEffect(() => {
-    if (!satElem || !debrisElem) return;
+    const scene = sceneRef.current;
+    if (!satElem || !debrisElem || !scene) return;
 
     let satState;
     if (appliedManeuver && simTimeSeconds >= appliedManeuver.burnTimeSeconds) {
@@ -379,6 +419,17 @@ export default function SpaceMap3D({
 
       const vDir = new THREE.Vector3(satState.velocity[0], satState.velocity[1], satState.velocity[2]).normalize();
       satMeshRef.current.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), vDir);
+
+      // Dynamic Velocity Vector Arrow Helper (Section 13)
+      if (!velArrowRef.current) {
+        const arrow = new THREE.ArrowHelper(vDir, satPos, 1.8, 0x38bdf8, 0.4, 0.25);
+        scene.add(arrow);
+        velArrowRef.current = arrow;
+      } else {
+        velArrowRef.current.position.copy(satPos);
+        velArrowRef.current.setDirection(vDir);
+        velArrowRef.current.visible = layers.velocityVector;
+      }
     }
 
     const debrisState = keplerianToStateVectors(debrisElem, simTimeSeconds);
@@ -398,6 +449,7 @@ export default function SpaceMap3D({
         conjunction.satTCAPosition[1] * SCALE,
         conjunction.satTCAPosition[2] * SCALE
       );
+      hazardSphereRef.current.visible = layers.tcaPoint;
       if (appliedManeuver) {
         hazardSphereRef.current.material.color.setHex(0x10b981);
       } else if (threatLevel?.name === 'CRITICAL') {
@@ -423,7 +475,7 @@ export default function SpaceMap3D({
         controlsRef.current.target.set(0, 0, 0);
       }
     }
-  }, [simTimeSeconds, satElem, debrisElem, appliedManeuver, conjunction, cameraMode, threatLevel]);
+  }, [simTimeSeconds, satElem, debrisElem, appliedManeuver, conjunction, cameraMode, threatLevel, layers]);
 
   // Zoom control helpers
   const handleZoomIn = () => {
@@ -497,7 +549,79 @@ export default function SpaceMap3D({
         >
           <Compass className="w-4 h-4" /> {autoRotate ? 'ORBIT ON' : 'ORBIT OFF'}
         </button>
+        <button
+          onClick={() => setShowLayerToggles(!showLayerToggles)}
+          className={`px-2.5 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1 ${
+            showLayerToggles ? 'bg-cyan-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+          }`}
+          title="Toggle Visual Display Layers"
+        >
+          <Layers className="w-4 h-4" /> LAYERS
+        </button>
       </div>
+
+      {/* Floating Visual Display Layer Checkboxes (Section 13, 21) */}
+      {showLayerToggles && (
+        <div className="absolute top-16 right-4 z-20 bg-slate-900/95 backdrop-blur-md p-3 rounded-xl border border-slate-700 shadow-2xl text-xs font-mono space-y-2 w-56">
+          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block border-b border-slate-800 pb-1">
+            VISUALIZATION LAYERS
+          </span>
+          <label className="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+            <input
+              type="checkbox"
+              checked={layers.beforeOrbit}
+              onChange={e => setLayers(l => ({ ...l, beforeOrbit: e.target.checked }))}
+              className="accent-cyan-500 rounded"
+            />
+            <span>Before Trajectory (Cyan)</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+            <input
+              type="checkbox"
+              checked={layers.afterOrbit}
+              onChange={e => setLayers(l => ({ ...l, afterOrbit: e.target.checked }))}
+              className="accent-emerald-500 rounded"
+            />
+            <span>After Trajectory (Green)</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+            <input
+              type="checkbox"
+              checked={layers.debrisOrbit}
+              onChange={e => setLayers(l => ({ ...l, debrisOrbit: e.target.checked }))}
+              className="accent-rose-500 rounded"
+            />
+            <span>Debris Trajectory (Red)</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+            <input
+              type="checkbox"
+              checked={layers.velocityVector}
+              onChange={e => setLayers(l => ({ ...l, velocityVector: e.target.checked }))}
+              className="accent-cyan-400 rounded"
+            />
+            <span>Velocity Vector Arrow</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+            <input
+              type="checkbox"
+              checked={layers.tcaPoint}
+              onChange={e => setLayers(l => ({ ...l, tcaPoint: e.target.checked }))}
+              className="accent-amber-500 rounded"
+            />
+            <span>TCA Hazard Sphere</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+            <input
+              type="checkbox"
+              checked={layers.burnPoint}
+              onChange={e => setLayers(l => ({ ...l, burnPoint: e.target.checked }))}
+              className="accent-amber-400 rounded"
+            />
+            <span>Burn Point Marker</span>
+          </label>
+        </div>
+      )}
 
       {/* Bottom Target Camera Selection Toolbar */}
       <div className="absolute bottom-4 right-4 flex flex-wrap items-center gap-1.5 bg-slate-900/95 backdrop-blur-md p-1.5 rounded-xl border border-slate-700 shadow-2xl text-xs font-mono">

@@ -223,7 +223,7 @@ export function applyManeuverImpulse(keplerianElem, burnTimeSeconds, deltaV_RIC_
     newKeplerianAtBurn,
     burnTimeSeconds,
     dV_ECI,
-    dV_RIC_ms,
+    deltaV_RIC_ms,
     deltaVMag_ms: Math.sqrt(deltaV_RIC_ms[0] ** 2 + deltaV_RIC_ms[1] ** 2 + deltaV_RIC_ms[2] ** 2)
   };
 }
@@ -331,5 +331,84 @@ export function generateOrbitPathPoints(keplerianElem, tBaseSeconds = 0, numPoin
     });
   }
   return points;
+}
+
+/**
+ * Extract complete physical orbital state from Cartesian state vectors (r, v)
+ */
+export function extractOrbitalState(rECI, vECI) {
+  const rx = rECI[0], ry = rECI[1], rz = rECI[2];
+  const vx = vECI[0], vy = vECI[1], vz = vECI[2];
+
+  const rMag = Math.sqrt(rx * rx + ry * ry + rz * rz);
+  const vMag = Math.sqrt(vx * vx + vy * vy + vz * vz);
+  const altitudeKm = rMag - EARTH_RADIUS_KM;
+
+  const kep = stateVectorsToKeplerian(rECI, vECI);
+  const orbitalPeriodSec = 2 * Math.PI * Math.sqrt(Math.abs(kep.a) ** 3 / MU_EARTH);
+  const orbitalPeriodMin = orbitalPeriodSec / 60;
+
+  return {
+    position: [rx, ry, rz],
+    rMagKm: rMag,
+    altitudeKm,
+    velocity: [vx, vy, vz],
+    speedKmS: vMag,
+    speedMs: vMag * 1000,
+    semiMajorAxisKm: kep.a,
+    eccentricity: kep.e,
+    inclinationRad: kep.i,
+    inclinationDeg: (kep.i * 180) / Math.PI,
+    raanRad: kep.raan,
+    raanDeg: (kep.raan * 180) / Math.PI,
+    argPerRad: kep.argPer,
+    argPerDeg: (kep.argPer * 180) / Math.PI,
+    trueAnomalyRad: kep.trueAnomaly,
+    trueAnomalyDeg: (kep.trueAnomaly * 180) / Math.PI,
+    orbitalPeriodSec,
+    orbitalPeriodMin
+  };
+}
+
+/**
+ * Compare two orbital states (BEFORE vs AFTER maneuver) with rigorous deltas
+ */
+export function compareOrbitalStates(stateBefore, stateAfter, deltaV_RIC_ms = [0, 0, 0], deltaV_ECI_km_s = null) {
+  const dSpeedKmS = stateAfter.speedKmS - stateBefore.speedKmS;
+  const dSpeedMs = dSpeedKmS * 1000;
+  const deltaVMagMs = Math.sqrt(deltaV_RIC_ms[0] ** 2 + deltaV_RIC_ms[1] ** 2 + deltaV_RIC_ms[2] ** 2);
+
+  // If ECI deltaV was not provided, derive it from velocity vectors
+  const dV_ECI = deltaV_ECI_km_s || [
+    stateAfter.velocity[0] - stateBefore.velocity[0],
+    stateAfter.velocity[1] - stateBefore.velocity[1],
+    stateAfter.velocity[2] - stateBefore.velocity[2]
+  ];
+
+  return {
+    before: stateBefore,
+    after: stateAfter,
+    deltas: {
+      speedKmS: dSpeedKmS,
+      speedMs: dSpeedMs,
+      altitudeKm: stateAfter.altitudeKm - stateBefore.altitudeKm,
+      semiMajorAxisKm: stateAfter.semiMajorAxisKm - stateBefore.semiMajorAxisKm,
+      eccentricity: stateAfter.eccentricity - stateBefore.eccentricity,
+      inclinationDeg: stateAfter.inclinationDeg - stateBefore.inclinationDeg,
+      raanDeg: stateAfter.raanDeg - stateBefore.raanDeg,
+      argPerDeg: stateAfter.argPerDeg - stateBefore.argPerDeg,
+      orbitalPeriodMin: stateAfter.orbitalPeriodMin - stateBefore.orbitalPeriodMin
+    },
+    vectors: {
+      vBefore_km_s: stateBefore.velocity,
+      vAfter_km_s: stateAfter.velocity,
+      deltaV_ECI_km_s: dV_ECI,
+      deltaV_RIC_ms: deltaV_RIC_ms,
+      deltaVMagMs: deltaVMagMs,
+      deltaSpeedMs: dSpeedMs,
+      // Note: Delta-speed magnitude is NOT equal to Delta-V magnitude when burn has non-tangential components!
+      isNonTangentialBurn: Math.abs(deltaVMagMs - Math.abs(dSpeedMs)) > 0.001
+    }
+  };
 }
 

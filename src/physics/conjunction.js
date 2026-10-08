@@ -1,4 +1,4 @@
-import { keplerianToStateVectors, getRICMatrix } from './orbitEngine.js';
+import { keplerianToStateVectors, getRICMatrix, extractOrbitalState } from './orbitEngine.js';
 
 /**
  * Perform Conjunction Assessment between Satellite and Debris
@@ -107,6 +107,10 @@ export function calculateConjunction(satElem, debrisElem, searchWindowSeconds = 
   const intrackKm = I[0] * deltaECI[0] + I[1] * deltaECI[1] + I[2] * deltaECI[2];
   const crosstrackKm = C[0] * deltaECI[0] + C[1] * deltaECI[1] + C[2] * deltaECI[2];
 
+  // Full extracted physical orbital states at TCA
+  const satOrbitalState = extractOrbitalState(satTCA.position, satTCA.velocity);
+  const debrisOrbitalState = extractOrbitalState(debrisTCA.position, debrisTCA.velocity);
+
   // Sample distance curve d(t) for chart visualization (e.g. 60 time points around TCA)
   const trajectorySeries = [];
   const startT = Math.max(0, tTCA - 1200);
@@ -134,7 +138,11 @@ export function calculateConjunction(satElem, debrisElem, searchWindowSeconds = 
     relativeVelocityKmS,
     relativeVelocityMs: relativeVelocityKmS * 1000,
     satTCAPosition: satTCA.position,
+    satTCAVelocity: satTCA.velocity,
     debrisTCAPosition: debrisTCA.position,
+    debrisTCAVelocity: debrisTCA.velocity,
+    satOrbitalState,
+    debrisOrbitalState,
     ricOffsetKm: { radial: radialKm, intrack: intrackKm, crosstrack: crosstrackKm },
     trajectorySeries
   };

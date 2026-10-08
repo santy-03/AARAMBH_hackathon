@@ -61,12 +61,12 @@ export const HACKATHON_SCENARIOS = [
       sizeMeters: 0.8,
       massKg: 12.5,
       keplerian: {
-        a: EARTH_RADIUS_KM + 554,
-        e: 0.0035,
-        i: deg2rad(68.5), // High inclination intersection angle
-        raan: deg2rad(142.0),
-        argPer: deg2rad(180.0),
-        meanAnomaly: deg2rad(328.5)
+        a: EARTH_RADIUS_KM + 558.56,
+        e: 0.00003,
+        i: deg2rad(112.30), // High inclination crossing angle
+        raan: deg2rad(153.05),
+        argPer: deg2rad(208.43),
+        meanAnomaly: deg2rad(201.97)
       }
     }
   },
