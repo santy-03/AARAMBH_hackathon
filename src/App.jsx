@@ -146,9 +146,11 @@ export default function App() {
   const optimizationResult = useMemo(() => {
     return optimizeAvoidanceManeuver(
       currentSatellite.keplerian,
-      targetDebris.keplerian
+      targetDebris.keplerian,
+      5.0,
+      bgDebrisCatalog
     );
-  }, [currentSatellite, targetDebris]);
+  }, [currentSatellite, targetDebris, bgDebrisCatalog]);
 
   // Simulation loop timer
   useEffect(() => {

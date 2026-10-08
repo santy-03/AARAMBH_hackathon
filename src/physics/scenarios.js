@@ -5,8 +5,41 @@ const deg2rad = d => (d * Math.PI) / 180;
 
 export const HACKATHON_SCENARIOS = [
   {
+    id: 'safe-pass-nominal',
+    name: 'Scenario 1: Safe Pass (No Maneuver Required)',
+    description: 'ISS encounter with orbital rocket body at 18.5 km safe miss distance. Evaluates NOMINAL state.',
+    satellite: {
+      name: 'ISS (ZARYA SAT-0)',
+      noradId: 25544,
+      keplerian: {
+        a: EARTH_RADIUS_KM + 418, // 418 km altitude
+        e: 0.0006,
+        i: deg2rad(51.64),
+        raan: deg2rad(95.0),
+        argPer: deg2rad(130.0),
+        meanAnomaly: deg2rad(40.0)
+      }
+    },
+    primaryDebris: {
+      id: 'BG-9901',
+      name: 'SL-12 Spent Rocket Body',
+      catalogNumber: 28910,
+      origin: 'Orbital Stage Drift',
+      sizeMeters: 3.2,
+      massKg: 1200.0,
+      keplerian: {
+        a: EARTH_RADIUS_KM + 438, // 20 km higher altitude pass
+        e: 0.0010,
+        i: deg2rad(51.64),
+        raan: deg2rad(95.0),
+        argPer: deg2rad(130.0),
+        meanAnomaly: deg2rad(40.0)
+      }
+    }
+  },
+  {
     id: 'leo-high-risk',
-    name: 'LEO High-Risk Intersection',
+    name: 'Scenario 2: LEO High-Risk Intersection',
     description: 'Starlink-701 encounter with Fengyun-1C Anti-Satellite Fragment D-904 at 14.6 km/s relative speed.',
     satellite: {
       name: 'Starlink-701 (SAT-A)',
@@ -39,8 +72,8 @@ export const HACKATHON_SCENARIOS = [
   },
   {
     id: 'cosmos-asat-swarm',
-    name: 'Cosmos-1408 Debris Field Swarm',
-    description: 'Sentinel-2 Polar Earth Observation Satellite passing through high-density ASAT breakup debris.',
+    name: 'Scenario 3: Multi-Debris & Secondary Screening',
+    description: 'Sentinel-2 passing ASAT breakup field. Candidate burn screening rejects maneuvers creating secondary hazards.',
     satellite: {
       name: 'Sentinel-2 (SAT-B)',
       noradId: 40697,

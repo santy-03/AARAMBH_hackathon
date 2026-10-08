@@ -229,11 +229,96 @@ export function applyManeuverImpulse(keplerianElem, burnTimeSeconds, deltaV_RIC_
 }
 
 /**
+ * RK4 (Runge-Kutta 4th Order) Numerical Integrator for 3D Cartesian State Vector propagation
+ * Integrates dr/dt = v, dv/dt = -mu*r/|r|^3 (+ J2 oblateness acceleration)
+ */
+export function propagateStateRK4(r0, v0, dtSeconds, stepSize = 10, includeJ2 = true) {
+  let r = [...r0];
+  let v = [...v0];
+  let t = 0;
+  const numSteps = Math.ceil(Math.abs(dtSeconds) / stepSize);
+  const dt = dtSeconds >= 0 ? stepSize : -stepSize;
+
+  function acceleration(pos) {
+    const rx = pos[0], ry = pos[1], rz = pos[2];
+    const rMag = Math.sqrt(rx * rx + ry * ry + rz * rz);
+    const r3 = rMag * rMag * rMag;
+
+    // Two-body gravity acceleration
+    let ax = -(MU_EARTH * rx) / r3;
+    let ay = -(MU_EARTH * ry) / r3;
+    let az = -(MU_EARTH * rz) / r3;
+
+    if (includeJ2) {
+      const z2OverR2 = (rz * rz) / (rMag * rMag);
+      const j2Factor = 1.5 * J2_EARTH * (EARTH_RADIUS_KM / rMag) ** 2 * (MU_EARTH / (rMag * rMag));
+      ax += j2Factor * (rx / rMag) * (5 * z2OverR2 - 1);
+      ay += j2Factor * (ry / rMag) * (5 * z2OverR2 - 1);
+      az += j2Factor * (rz / rMag) * (5 * z2OverR2 - 3);
+    }
+    return [ax, ay, az];
+  }
+
+  for (let i = 0; i < numSteps; i++) {
+    const step = (i === numSteps - 1) ? (dtSeconds - t) : dt;
+
+    // k1
+    const a1 = acceleration(r);
+    const v1 = [...v];
+
+    // k2
+    const r2 = [r[0] + 0.5 * step * v1[0], r[1] + 0.5 * step * v1[1], r[2] + 0.5 * step * v1[2]];
+    const v2 = [v[0] + 0.5 * step * a1[0], v[1] + 0.5 * step * a1[1], v[2] + 0.5 * step * a1[2]];
+    const a2 = acceleration(r2);
+
+    // k3
+    const r3 = [r[0] + 0.5 * step * v2[0], r[1] + 0.5 * step * v2[1], r[2] + 0.5 * step * v2[2]];
+    const v3 = [v[0] + 0.5 * step * a2[0], v[1] + 0.5 * step * a2[1], v[2] + 0.5 * step * a2[2]];
+    const a3 = acceleration(r3);
+
+    // k4
+    const r4 = [r[0] + step * v3[0], r[1] + step * v3[1], r[2] + step * v3[2]];
+    const v4 = [v[0] + step * a3[0], v[1] + step * a3[1], v[2] + step * a3[2]];
+    const a4 = acceleration(r4);
+
+    // Update position & velocity
+    r[0] += (step / 6) * (v1[0] + 2 * v2[0] + 2 * v3[0] + v4[0]);
+    r[1] += (step / 6) * (v1[1] + 2 * v2[1] + 2 * v3[1] + v4[1]);
+    r[2] += (step / 6) * (v1[2] + 2 * v2[2] + 2 * v3[2] + v4[2]);
+
+    v[0] += (step / 6) * (a1[0] + 2 * a2[0] + 2 * a3[0] + a4[0]);
+    v[1] += (step / 6) * (a1[1] + 2 * a2[1] + 2 * a3[1] + a4[1]);
+    v[2] += (step / 6) * (a1[2] + 2 * a2[2] + 2 * a3[2] + a4[2]);
+
+    t += step;
+  }
+
+  return { position: r, velocity: v };
+}
+
+/**
+ * Calculate Propellant Consumption using Tsiolkovsky Rocket Equation
+ * delta_v = Isp * g0 * ln(m0 / mf)  =>  mf = m0 / exp(delta_v / (Isp * g0))
+ */
+export function calculatePropellantMass(deltaV_ms, wetMassKg = 1000, ispSeconds = 300) {
+  const g0 = 9.80665; // m/s^2
+  const mf = wetMassKg / Math.exp(deltaV_ms / (ispSeconds * g0));
+  const propellantKg = wetMassKg - mf;
+  return {
+    wetMassKg,
+    finalMassKg: parseFloat(mf.toFixed(3)),
+    propellantKg: parseFloat(propellantKg.toFixed(4)),
+    propellantGrams: parseFloat((propellantKg * 1000).toFixed(1)),
+    ispSeconds,
+    g0
+  };
+}
+
+/**
  * Generate discrete points along orbit path for visualization (0 to 2pi true anomaly)
  */
 export function generateOrbitPathPoints(keplerianElem, tBaseSeconds = 0, numPoints = 120) {
   const points = [];
-  const state0 = keplerianToStateVectors(keplerianElem, tBaseSeconds);
   const period = 2 * Math.PI * Math.sqrt(keplerianElem.a ** 3 / MU_EARTH);
   const dtStep = period / numPoints;
 
@@ -247,3 +332,4 @@ export function generateOrbitPathPoints(keplerianElem, tBaseSeconds = 0, numPoin
   }
   return points;
 }
+

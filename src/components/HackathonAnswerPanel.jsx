@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ShieldAlert, CheckCircle2, Zap, Calculator, ArrowRight, Play, RefreshCw } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, Zap, Calculator, ArrowRight, Play, RefreshCw, Code } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { generateMasterApiPayload } from '../physics/apiResult.js';
 
 export default function HackathonAnswerPanel({
   satelliteName,
@@ -12,7 +13,7 @@ export default function HackathonAnswerPanel({
   onApplyManeuver,
   onCustomStateInput
 }) {
-  const [activeTab, setActiveTab] = useState('OUTPUT'); // 'OUTPUT' or 'CUSTOM_INPUT'
+  const [activeTab, setActiveTab] = useState('OUTPUT'); // 'OUTPUT', 'CUSTOM_INPUT', or 'JSON_API'
 
   // Form states for manual state vector input (x, y, z, vx, vy, vz)
   const [satX, setSatX] = useState(0);
@@ -33,6 +34,15 @@ export default function HackathonAnswerPanel({
 
   const recManeuver = optimizationResult.recommendedManeuver;
   const isSafe = !riskAssessment.isUnsafe || appliedManeuver;
+
+  const masterApiJson = generateMasterApiPayload(
+    satelliteName,
+    primaryDebris,
+    conjunction,
+    riskAssessment,
+    optimizationResult,
+    appliedManeuver
+  );
 
   const handleExecuteRecommended = () => {
     if (recManeuver) {
@@ -73,7 +83,7 @@ export default function HackathonAnswerPanel({
         </div>
 
         {/* Tab Toggle */}
-        <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+        <div className="flex flex-wrap items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
           <button
             onClick={() => setActiveTab('OUTPUT')}
             className={`px-3 py-1 rounded font-bold transition-colors ${
@@ -89,6 +99,15 @@ export default function HackathonAnswerPanel({
             }`}
           >
             🧮 INPUT STATE VECTORS (X,Y,Z)
+          </button>
+
+          <button
+            onClick={() => setActiveTab('JSON_API')}
+            className={`px-3 py-1 rounded font-bold transition-colors flex items-center gap-1 ${
+              activeTab === 'JSON_API' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Code className="w-3.5 h-3.5" /> MASTER API JSON
           </button>
         </div>
       </div>
@@ -282,6 +301,26 @@ export default function HackathonAnswerPanel({
             <RefreshCw className="w-4 h-4" /> CALCULATE CONJUNCTION & MIN-ENERGY AVOIDANCE FOR THIS STATE VECTOR
           </button>
         </form>
+      )}
+
+      {/* Tab 3: Standard Master Prompt API JSON Response View */}
+      {activeTab === 'JSON_API' && (
+        <div className="bg-slate-950 p-4 rounded-xl border border-emerald-500/40 space-y-3 font-mono">
+          <div className="flex items-center justify-between">
+            <span className="text-emerald-400 font-bold text-xs flex items-center gap-1.5">
+              <Code className="w-4 h-4" /> STANDARDIZED API JSON PAYLOAD (MASTER PROMPT SCHEMA)
+            </span>
+            <span className="text-[10px] text-slate-400">Response Object format for API / Microservices</span>
+          </div>
+
+          <pre className="bg-slate-900 p-3.5 rounded-lg border border-slate-800 text-[11px] text-emerald-300 overflow-x-auto max-h-[260px] custom-scrollbar selection:bg-emerald-900">
+            {JSON.stringify(masterApiJson, null, 2)}
+          </pre>
+
+          <p className="text-[10px] text-slate-400">
+            This API response object provides real-time telemetry, TCA, risk classification, minimum-energy burn ($\Delta v$ m/s), propellant consumption, and secondary debris screening status.
+          </p>
+        </div>
       )}
     </div>
   );
